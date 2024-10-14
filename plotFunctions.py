@@ -261,3 +261,60 @@ def Preds_plot(dfPreds, fileName):
     ax2.tick_params(axis='y', colors='sandybrown')
     
     plt.savefig(f'{fileName}.pdf', dpi=600, bbox_inches='tight')
+
+def Calibration_curve_from_preds(dfpreds, fileName):
+    from scipy.interpolate import interp1d
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    dfpreds['brier_score_mean'] = dfpreds['brier_score'].mean()
+    # Extract the predicted probabilities and fraction of positives columns
+    mean_predicted_values_calibrated = dfpreds['mean_predicted_probability'].tolist()
+    fraction_of_positives_calibrated = dfpreds['fraction_of_positives'].tolist()
+    brier_mean = np.round(dfpreds['brier_score_mean'].iloc[0]*100, 2)
+
+    sns.set(font_scale=1.8)
+    sns.set_style('ticks')
+
+    # Define a common set of points for interpolation (e.g., 100 points between 0 and 1)
+    common_prob = np.linspace(0, 1, 100)
+
+    # Interpolating for each fold
+    interpolated_fractions = []
+    interpolated_means = []
+
+    for fold in range(len(mean_predicted_values_calibrated)):
+        # Interpolate the fraction of positives for this fold
+        interp_func = interp1d(mean_predicted_values_calibrated[fold], fraction_of_positives_calibrated[fold], bounds_error=False, fill_value="extrapolate")
+        interpolated_fractions.append(interp_func(common_prob))
+
+        # Interpolating mean predicted values (optional but keeps alignment)
+        interp_mean_func = interp1d(mean_predicted_values_calibrated[fold], mean_predicted_values_calibrated[fold], bounds_error=False, fill_value="extrapolate")
+        interpolated_means.append(interp_mean_func(common_prob))
+
+    # Convert lists to arrays for easier manipulation
+    interpolated_fractions = np.array(interpolated_fractions)
+    interpolated_means = np.array(interpolated_means)
+
+    # Compute the mean across all folds
+    mean_fraction_of_positives = np.nanmean(interpolated_fractions, axis=0)
+    mean_predicted_values = np.nanmean(interpolated_means, axis=0)
+
+    # Create one figure for the plot
+    plt.figure(figsize=(8, 6))
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
+
+    # Plot the calibration curve
+    plt.plot(mean_predicted_values, mean_fraction_of_positives, marker='o', label=f"Calibrated Model (Brier score: {brier_mean}")
+
+    plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Perfectly calibrated')
+
+    # Add labels and title
+    plt.xlabel('Mean Predicted Probability')
+    plt.ylabel('Fraction of Positives')
+    plt.title('Calibration Curve: Calibrated Model (Interpolated)')
+    plt.legend(fontsize=16, frameon=False)
+
+    # Save the plot
+    plt.savefig(f'{fileName}.pdf', dpi=600, bbox_inches='tight')

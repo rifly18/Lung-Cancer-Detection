@@ -12,10 +12,11 @@ def LoadData():
     # Test data
     X_200 = df_200_samples.drop('LC', axis=1)
     y_200 = df_200_samples['LC']
+
     
     return X,y,X_200,y_200
 
-def PreprocessData(X_train, y_train, X_val, y_val, X_200, y_200):
+def PreprocessData(X_train, y_train, X_val, y_val, X_200, y_200,modelName):
     from imblearn.under_sampling import RandomUnderSampler
     from sklearn.compose import make_column_transformer
     from sklearn.pipeline import Pipeline
@@ -23,6 +24,7 @@ def PreprocessData(X_train, y_train, X_val, y_val, X_200, y_200):
     from sklearn.preprocessing import StandardScaler
     from sklearn.utils import shuffle
     import pandas as pd
+    
     rus = RandomUnderSampler(random_state=2)
     numeric_medianProcessing = Pipeline(
     [('Imputation', SimpleImputer(strategy='median')),
@@ -31,21 +33,45 @@ def PreprocessData(X_train, y_train, X_val, y_val, X_200, y_200):
     preprocessing = make_column_transformer((numeric_medianProcessing,["ALAT","Amylase","Alkaline phosphatase","Basophils","Bilirubin-total","C-reactive protein","Calcium-total","Eosinophils","INR","Creatinine",
                                                                        "LDH","Leucocytes","Lymphocytes","Monocytes","Neutrophils","Platelets","Age","Albumin","Hemoglobin","Sodium",'Potassium','Gender','Smoking status']))
 
+    X_cal = []
+    y_cal = []
+    if modelName == "DES Calibrated":
+        from sklearn.model_selection import train_test_split
 
-     # Fit pipeline
-    X_train = preprocessing.fit_transform(X_train)
-    X_val = preprocessing.transform(X_val)
-    
-    if isinstance(X_200, pd.DataFrame):
-        X_200 = preprocessing.transform(X_200)
+        X_train, X_cal, y_train, y_cal = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+             # Fit pipeline
+        X_train = preprocessing.fit_transform(X_train)
+        X_val = preprocessing.transform(X_val)
+        X_cal = preprocessing.transform(X_cal)
         
+        if isinstance(X_200, pd.DataFrame):
+            X_200 = preprocessing.transform(X_200)
+            
+        
+        # Undersample
+        X_train,y_train = rus.fit_resample(X_train,y_train)
     
-    # Undersample
-    X_train,y_train = rus.fit_resample(X_train,y_train)
+        #Shuffle data
+        X_train, y_train = shuffle(X_train, y_train)
+        X_val, y_val = shuffle(X_val, y_val)
+        X_200, y_200 = shuffle(X_200, y_200)
+        X_cal,y_cal = shuffle(X_cal,y_cal)
+    elif modelName != 'DES Calibrated':
+
+         # Fit pipeline
+        X_train = preprocessing.fit_transform(X_train)
+        X_val = preprocessing.transform(X_val)
+        
+        if isinstance(X_200, pd.DataFrame):
+            X_200 = preprocessing.transform(X_200)
+            
+        
+        # Undersample
+        X_train,y_train = rus.fit_resample(X_train,y_train)
+        
+        #Shuffle data
+        X_train, y_train = shuffle(X_train, y_train)
+        X_val, y_val = shuffle(X_val, y_val)
+        X_200, y_200 = shuffle(X_200, y_200)
     
-    #Shuffle data
-    X_train, y_train = shuffle(X_train, y_train)
-    X_val, y_val = shuffle(X_val, y_val)
-    X_200, y_200 = shuffle(X_200, y_200)
-    
-    return X_train, y_train, X_val, y_val, X_200, y_200
+    return X_train, y_train, X_val, y_val, X_200, y_200,X_cal,y_cal
